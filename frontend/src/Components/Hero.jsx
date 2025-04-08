@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Car, Users, DollarSign, Clock } from "lucide-react";
-import heroming from "../assets/Hero.jpeg";
+import heroming from "../assets/heroimg.png";
 import a1 from "../assets/a1.png";
 import a2 from "../assets/a2.png";
 import a3 from "../assets/a3.png";

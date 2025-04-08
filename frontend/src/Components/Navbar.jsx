@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Car, ChevronDown, Home, Info, MessageCircle, Shield, X, Menu } from "lucide-react"
+import logo from "../assets/logo.png"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -25,8 +26,8 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between p-4 bg-gradient-to-r from-[#EFBC9B] to-[#F5D0B5] shadow-lg">
       <div className="flex items-center gap-2">
-        <Car className="h-6 w-6 text-[#9CAFAA]" />
-        <h1 className="text-xl font-bold tracking-tight">Carpooling</h1>
+        <img src={logo} className="h-6 w-18 text-[#9CAFAA]" />
+        <h1 className="text-xl font-bold tracking-tight">CoRide</h1>
       </div>
 
       {/* Desktop Navigation */}

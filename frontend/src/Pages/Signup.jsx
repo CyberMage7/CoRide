@@ -259,7 +259,7 @@ export default function Signup() {
               }}
               transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
             >
-              Welcome to Co-Rider
+              Welcome to Co-Ride  
             </motion.h1>
             <motion.p
               className="text-gray-600"
@@ -627,7 +627,7 @@ export default function Signup() {
                   {/* Preferred Gender */}
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Preferred Gender to Travel With
+                      Enter Gender
                     </label>
                     <select
                       name="preferredGender"
@@ -828,7 +828,7 @@ export default function Signup() {
             }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            Co-Rider
+            Co-Ride
           </motion.h2>
 
           <motion.p

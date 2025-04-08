@@ -4,13 +4,14 @@ const otpTemplate = (otp) => {
 	
 	<head>
 		<meta charset="UTF-8">
-		<title>OTP Verification Email</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Verify Your CoRide Account</title>
 		<style>
 			body {
-				background-color: #ffffff;
-				font-family: Arial, sans-serif;
+				background-color: #f8f9fa;
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 				font-size: 16px;
-				line-height: 1.4;
+				line-height: 1.6;
 				color: #333333;
 				margin: 0;
 				padding: 0;
@@ -19,46 +20,150 @@ const otpTemplate = (otp) => {
 			.container {
 				max-width: 600px;
 				margin: 0 auto;
-				padding: 20px;
+				padding: 30px;
+				background-color: #ffffff;
+				border-radius: 8px;
+				box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+			}
+	
+			.header {
 				text-align: center;
+				padding-bottom: 20px;
+				border-bottom: 1px solid #eeeeee;
+				margin-bottom: 30px;
 			}
 	
 			.logo {
-				max-width: 200px;
-				margin-bottom: 20px;
+				max-width: 180px;
+				margin-bottom: 15px;
 			}
 	
 			.message {
-				font-size: 18px;
-				font-weight: bold;
+				font-size: 24px;
+				font-weight: 600;
+				color: #2c3e50;
 				margin-bottom: 20px;
 			}
 	
 			.body {
 				font-size: 16px;
-				margin-bottom: 20px;
+				margin-bottom: 30px;
+				color: #4a4a4a;
+			}
+	
+			.otp-container {
+				background-color: #f5f7f9;
+				border-radius: 6px;
+				padding: 15px;
+				margin: 25px auto;
+				width: 60%;
+				text-align: center;
+				border: 1px solid #e1e4e8;
+			}
+	
+			.otp-code {
+				letter-spacing: 5px;
+				font-size: 28px;
+				font-weight: bold;
+				color: #3498db;
+				margin: 10px 0;
+				font-family: monospace;
 			}
 	
 			.cta {
 				display: inline-block;
-				padding: 10px 20px;
-				background-color: #FFD60A;
-				color: #000000;
+				padding: 12px 25px;
+				background-color: #3498db;
+				color: #ffffff;
 				text-decoration: none;
-				border-radius: 5px;
+				border-radius: 6px;
 				font-size: 16px;
-				font-weight: bold;
+				font-weight: 600;
 				margin-top: 20px;
+				transition: background-color 0.3s;
+			}
+	
+			.cta:hover {
+				background-color: #2980b9;
+			}
+	
+			.expiry-notice {
+				font-size: 14px;
+				color: #e74c3c;
+				margin: 20px 0;
+				font-style: italic;
 			}
 	
 			.support {
 				font-size: 14px;
-				color: #999999;
-				margin-top: 20px;
+				color: #7f8c8d;
+				margin-top: 30px;
+				text-align: center;
+				padding-top: 20px;
+				border-top: 1px solid #eeeeee;
+			}
+	
+			.footer {
+				margin-top: 30px;
+				text-align: center;
+				font-size: 12px;
+				color: #95a5a6;
+			}
+	
+			.social-icons {
+				margin: 15px 0;
+			}
+	
+			.social-icon {
+				display: inline-block;
+				margin: 0 10px;
+				width: 30px;
+				height: 30px;
 			}
 	
 			.highlight {
 				font-weight: bold;
+				color: #2c3e50;
+			}
+	
+			.benefits {
+				background-color: #f0f7ff;
+				border-left: 4px solid #3498db;
+				padding: 15px;
+				margin: 20px 0;
+				border-radius: 0 6px 6px 0;
+			}
+	
+			.benefits-title {
+				font-weight: 600;
+				color: #2c3e50;
+				margin-bottom: 10px;
+			}
+	
+			.benefit-item {
+				margin: 5px 0;
+				display: flex;
+				align-items: center;
+			}
+	
+			.benefit-icon {
+				color: #3498db;
+				margin-right: 10px;
+				font-weight: bold;
+			}
+	
+			@media only screen and (max-width: 600px) {
+				.container {
+					padding: 20px;
+				}
+	
+				.otp-container {
+					width: 80%;
+				}
+	
+				.message {
+					font-size: 20px;
+				}
 			}
 		</style>
 	
@@ -66,19 +171,45 @@ const otpTemplate = (otp) => {
 	
 	<body>
 		<div class="container">
-			// <a href="https://studynotion-edtech-project.vercel.app"><img class="logo"
-			// 		src="https://i.ibb.co/7Xyj3PC/logo.png" alt="StudyNotion Logo"></a>
-			<div class="message">OTP Verification Email</div>
-			<div class="body">
-				<p>Dear User,</p>
-				<p>Thank you for registering with StudyNotion. To complete your registration, please use the following OTP
-					(One-Time Password) to verify your account:</p>
-				<h2 class="highlight">${otp}</h2>
-				<p>This OTP is valid for 5 minutes. If you did not request this verification, please disregard this email.
-				Once your account is verified, you will have access to our platform and its features.</p>
+			<div class="header">
+				<div class="message">Verify Your CoRide Account</div>
 			</div>
-			<div class="support">If you have any questions or need assistance, please feel free to reach out to us at <a
-					href="mailto:info@corider.com">info@corider.com</a>. We are here to help!</div>
+			<div class="body">
+				<p>Hi there,</p>
+				<p>Thanks for joining <span class="highlight">CoRide</span>, your campus community's trusted ride-sharing platform! Please verify your account with this one-time password:</p>
+				
+				<div class="otp-container">
+					<div class="otp-code">${otp}</div>
+				</div>
+				
+				<p class="expiry-notice">⏱️ This verification code expires in 5 minutes.</p>
+				
+				<div class="benefits">
+					<div class="benefits-title">Why join the CoRide community?</div>
+					<div class="benefit-item">
+						<span class="benefit-icon">✓</span> Save money on transportation with fellow students
+					</div>
+					<div class="benefit-item">
+						<span class="benefit-icon">✓</span> Reduce your carbon footprint
+					</div>
+					<div class="benefit-item">
+						<span class="benefit-icon">✓</span> Meet new friends from your campus
+					</div>
+				</div>
+				
+				<p>If you didn't sign up for a CoRide account, you can safely ignore this email.</p>
+				
+				<p>Need help? Our support team is ready to assist you!</p>
+			</div>
+			
+			<div class="support">
+				<p>Questions or need assistance? Contact us at <a href="mailto:support@coride.com">support@coride.com</a> or reply to this email.</p>
+			</div>
+			
+			<div class="footer">
+				<p>© CoRide</p>
+				<p>This is a transactional email related to your CoRide account. You received this because you signed up.</p>
+			</div>
 		</div>
 	</body>
 	
