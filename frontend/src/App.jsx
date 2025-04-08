@@ -7,6 +7,7 @@ import Signup from "./Pages/Signup"
 import OpenRoute from "./Components/core/OpenRoute"
 import VerifyEmail from "./Pages/VerifyEmail"
 import Login from "./Pages/Login"
+import UserDashboard from "./Pages/Dashboard";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="signup" element={<Signup />} />
         <Route path="login" element={<Login />} />
+        <Route path="dashboard" element={<UserDashboard />} />
         <Route
           path="verify-email"
           element={
