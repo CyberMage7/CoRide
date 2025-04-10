@@ -1,27 +1,39 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Link } from "react-router-dom"
-import { Car, ChevronDown, Home, Info, MessageCircle, Shield, X, Menu } from "lucide-react"
-import logo from "../assets/logo.png"
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  Car,
+  ChevronDown,
+  Home,
+  Info,
+  MessageCircle,
+  Shield,
+  X,
+  Menu,
+} from "lucide-react";
+import logo from "../assets/logo.png";
 
 export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false)
-  const [mobileHowItWorksOpen, setMobileHowItWorksOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [mobileHowItWorksOpen, setMobileHowItWorksOpen] = useState(false);
 
   // Helper function to create nav link classes based on active state
   const navLinkClass = (isActive) => `
     group inline-flex h-10 w-max items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors 
     hover:bg-[#9CAFAA]/20 hover:text-[#4A5D58] focus:bg-[#9CAFAA]/20 focus:text-[#4A5D58] focus:outline-none
     ${isActive ? "bg-[#9CAFAA]/20 text-[#4A5D58]" : ""}
-  `
+  `;
 
   // Helper function for mobile nav links
   const mobileNavLinkClass = (isActive) => `
     flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-[#9CAFAA]/20
     ${isActive ? "bg-[#9CAFAA]/20 text-[#4A5D58]" : ""}
-  `
+  `;
 
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between p-4 bg-gradient-to-r from-[#EFBC9B] to-[#F5D0B5] shadow-lg">
@@ -34,14 +46,20 @@ export default function Navbar() {
       <div className="hidden md:flex">
         <ul className="flex space-x-1">
           <li>
-            <Link to="/" className={navLinkClass(window.location.pathname === "/")}>
+            <Link
+              to="/"
+              className={navLinkClass(window.location.pathname === "/")}
+            >
               <Home className="mr-2 h-4 w-4" />
               <span>Home</span>
             </Link>
           </li>
 
           <li>
-            <Link to="/about" className={navLinkClass(window.location.pathname === "/about")}>
+            <Link
+              to="/about"
+              className={navLinkClass(window.location.pathname === "/about")}
+            >
               <Info className="mr-2 h-4 w-4" />
               <span>About</span>
             </Link>
@@ -55,7 +73,11 @@ export default function Navbar() {
             >
               <Car className="mr-2 h-4 w-4" />
               <span>How It Works</span>
-              <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`ml-1 h-4 w-4 transition-transform ${
+                  howItWorksOpen ? "rotate-180" : ""
+                }`}
+              />
             </button>
             {howItWorksOpen && (
               <div className="absolute left-0 top-full mt-2 w-[600px] rounded-md border border-[#9CAFAA]/20 bg-white p-4 shadow-lg">
@@ -66,9 +88,12 @@ export default function Navbar() {
                       to="/"
                     >
                       <Car className="h-6 w-6 text-white" />
-                      <div className="mb-2 mt-4 text-lg font-medium text-white">Start Carpooling Today</div>
+                      <div className="mb-2 mt-4 text-lg font-medium text-white">
+                        Start Carpooling Today
+                      </div>
                       <p className="text-sm leading-tight text-white/90">
-                        Join thousands of commuters saving money and reducing their carbon footprint.
+                        Join thousands of commuters saving money and reducing
+                        their carbon footprint.
                       </p>
                     </Link>
                   </li>
@@ -77,7 +102,9 @@ export default function Navbar() {
                       className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#9CAFAA]/20 focus:bg-[#9CAFAA]/20"
                       to="/find-ride"
                     >
-                      <div className="text-sm font-medium leading-none">Find a Ride</div>
+                      <div className="text-sm font-medium leading-none">
+                        Find a Ride
+                      </div>
                       <p className="line-clamp-2 text-sm leading-snug text-gray-500">
                         Search for available rides in your area
                       </p>
@@ -88,7 +115,9 @@ export default function Navbar() {
                       className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#9CAFAA]/20 focus:bg-[#9CAFAA]/20"
                       to="/offer-ride"
                     >
-                      <div className="text-sm font-medium leading-none">Offer a Ride</div>
+                      <div className="text-sm font-medium leading-none">
+                        Offer a Ride
+                      </div>
                       <p className="line-clamp-2 text-sm leading-snug text-gray-500">
                         Share your journey and reduce costs
                       </p>
@@ -99,7 +128,9 @@ export default function Navbar() {
                       className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#9CAFAA]/20 focus:bg-[#9CAFAA]/20"
                       to="/commutes"
                     >
-                      <div className="text-sm font-medium leading-none">Regular Commutes</div>
+                      <div className="text-sm font-medium leading-none">
+                        Regular Commutes
+                      </div>
                       <p className="line-clamp-2 text-sm leading-snug text-gray-500">
                         Set up recurring rides for your daily commute
                       </p>
@@ -110,18 +141,61 @@ export default function Navbar() {
             )}
           </li>
 
-          <li>
-            <Link to="/safety" className={navLinkClass(window.location.pathname === "/safety")}>
+          <li className="relative">
+            <button
+              className="group inline-flex h-10 w-max items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors hover:bg-[#9CAFAA]/20 hover:text-[#4A5D58] focus:bg-[#9CAFAA]/20 focus:text-[#4A5D58] focus:outline-none"
+              onClick={() => setSafetyOpen(!safetyOpen)}
+              onBlur={() => setTimeout(() => setSafetyOpen(false), 100)}
+            >
               <Shield className="mr-2 h-4 w-4" />
               <span>Safety & Trust</span>
-            </Link>
+              <ChevronDown
+                className={`ml-1 h-4 w-4 transition-transform ${
+                  safetyOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+            {safetyOpen && (
+              <div className="absolute left-0 top-full mt-2 w-[400px] rounded-md border border-[#9CAFAA]/20 bg-white p-4 shadow-lg">
+                <h4 className="text-md font-semibold mb-2">
+                  Your Safety Matters
+                </h4>
+                <p className="text-sm text-gray-600">
+                  CoRide ensures every ride is consent-based and verified
+                  through college IDs. Riders are notified before any shared
+                  match is finalized.
+                </p>
+              </div>
+            )}
           </li>
 
-          <li>
-            <Link to="/contact" className={navLinkClass(window.location.pathname === "/contact")}>
+          <li className="relative">
+            <button
+              className="group inline-flex h-10 w-max items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors hover:bg-[#9CAFAA]/20 hover:text-[#4A5D58] focus:bg-[#9CAFAA]/20 focus:text-[#4A5D58] focus:outline-none"
+              onClick={() => setContactOpen(!contactOpen)}
+              onBlur={() => setTimeout(() => setContactOpen(false), 100)}
+            >
               <MessageCircle className="mr-2 h-4 w-4" />
               <span>Contact</span>
-            </Link>
+              <ChevronDown
+                className={`ml-1 h-4 w-4 transition-transform ${
+                  contactOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+            {contactOpen && (
+              <div className="absolute left-0 top-full mt-2 w-[400px] rounded-md border border-[#9CAFAA]/20 bg-white p-4 shadow-lg">
+                <h4 className="text-md font-semibold mb-2">
+                  We'd love to hear from you!
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Got questions or suggestions? Reach us at{" "}
+                  <span className="text-[#4A5D58] font-medium">
+                    support@coride.com
+                  </span>
+                </p>
+              </div>
+            )}
           </li>
         </ul>
       </div>
@@ -137,7 +211,10 @@ export default function Navbar() {
 
       {/* Mobile Navigation Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setIsOpen(false)}>
+        <div
+          className="fixed inset-0 z-50 bg-black/50"
+          onClick={() => setIsOpen(false)}
+        >
           <div
             className="absolute right-0 top-0 h-full w-[300px] bg-[#EFBC9B] p-4 shadow-xl transition-transform"
             onClick={(e) => e.stopPropagation()}
@@ -160,7 +237,9 @@ export default function Navbar() {
                 <nav className="flex flex-col space-y-4">
                   <Link
                     to="/"
-                    className={mobileNavLinkClass(window.location.pathname === "/")}
+                    className={mobileNavLinkClass(
+                      window.location.pathname === "/"
+                    )}
                     onClick={() => setIsOpen(false)}
                   >
                     <Home className="mr-2 h-4 w-4" />
@@ -168,7 +247,9 @@ export default function Navbar() {
                   </Link>
                   <Link
                     to="/about"
-                    className={mobileNavLinkClass(window.location.pathname === "/about")}
+                    className={mobileNavLinkClass(
+                      window.location.pathname === "/about"
+                    )}
                     onClick={() => setIsOpen(false)}
                   >
                     <Info className="mr-2 h-4 w-4" />
@@ -177,14 +258,18 @@ export default function Navbar() {
                   <div className="flex flex-col">
                     <button
                       className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-[#9CAFAA]/20"
-                      onClick={() => setMobileHowItWorksOpen(!mobileHowItWorksOpen)}
+                      onClick={() =>
+                        setMobileHowItWorksOpen(!mobileHowItWorksOpen)
+                      }
                     >
                       <div className="flex items-center">
                         <Car className="mr-2 h-4 w-4" />
                         How It Works
                       </div>
                       <ChevronDown
-                        className={`h-4 w-4 transition-transform ${mobileHowItWorksOpen ? "rotate-180" : ""}`}
+                        className={`h-4 w-4 transition-transform ${
+                          mobileHowItWorksOpen ? "rotate-180" : ""
+                        }`}
                       />
                     </button>
                     {mobileHowItWorksOpen && (
@@ -215,7 +300,9 @@ export default function Navbar() {
                   </div>
                   <Link
                     to="/safety"
-                    className={mobileNavLinkClass(window.location.pathname === "/safety")}
+                    className={mobileNavLinkClass(
+                      window.location.pathname === "/safety"
+                    )}
                     onClick={() => setIsOpen(false)}
                   >
                     <Shield className="mr-2 h-4 w-4" />
@@ -223,7 +310,9 @@ export default function Navbar() {
                   </Link>
                   <Link
                     to="/contact"
-                    className={mobileNavLinkClass(window.location.pathname === "/contact")}
+                    className={mobileNavLinkClass(
+                      window.location.pathname === "/contact"
+                    )}
                     onClick={() => setIsOpen(false)}
                   >
                     <MessageCircle className="mr-2 h-4 w-4" />
@@ -244,6 +333,5 @@ export default function Navbar() {
         Sign Up / Login
       </Link>
     </nav>
-  )
+  );
 }
-

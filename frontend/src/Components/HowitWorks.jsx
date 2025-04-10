@@ -226,13 +226,13 @@ export default function HowItWorks() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.2, duration: 0.7 }}
           >
-            <motion.button
+            {/* <motion.button
               className="inline-flex h-12 items-center justify-center rounded-md bg-gradient-to-br from-[#EFBC9B] to-[#F5D0B5] px-8 text-base font-medium text-white shadow transition-colors hover:bg-gradient-to-br hover:from-[#F5D0B5] hover:to-[#EFBC9B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9CAFAA]"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
               Get Started Now
-            </motion.button>
+            </motion.button> */}
           </motion.div>
         </motion.div>
       </div>
