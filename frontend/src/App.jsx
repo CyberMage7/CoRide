@@ -10,6 +10,7 @@ import Login from "./Pages/Login"
 import UserDashboard from "./Pages/Dashboard";
 import { useDispatch, useSelector } from "react-redux";
 import { getUserProfile } from "./services/operations/authAPI";
+import AboutUs from "./Pages/AboutUs";
 
 function App() {
   const dispatch = useDispatch();
@@ -29,6 +30,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="signup" element={<Signup />} />
         <Route path="login" element={<Login />} />
+        <Route path="about" element={<AboutUs />} />
         <Route path="dashboard" element={<UserDashboard />} />
         <Route
           path="verify-email"
