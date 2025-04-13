@@ -358,8 +358,8 @@ function AnimatedMap() {
           r="6"
           fill="#FFDD00"
           filter="drop-shadow(0 0 8px rgba(255, 221, 0, 0.8))"
-          initial={{ offsetDistance: "0%" }}
-          animate={{ offsetDistance: "100%" }}
+          initial={{ pathOffset: "0%" }}
+          animate={{ pathOffset: "100%" }}
           transition={{ duration: 4, ease: "easeInOut", repeat: Number.POSITIVE_INFINITY, repeatType: "loop" }}
           style={{ offsetPath: "path('M100,400 C150,300 200,350 250,200 S350,100 400,100')" }}
         />

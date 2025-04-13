@@ -4,60 +4,108 @@ const OTP = require("../models/OTP")
 const jwt = require("jsonwebtoken")
 const otpGenerator = require("otp-generator")
 const mailSender = require("../utils/mailSender")
+const { uploadFileToCloudinary } = require("../utils/fileUploader")
+
 exports.signup = async (req, res) => {
   try {
-    const { fullName, email, phone, password,collegeName,preferredGender,emergencyContact,otp, } = req.body
-     // Check if user already exists
+    console.log("Signup request received:", {
+      body: req.body,
+      files: req.files ? "Files present" : "No files"
+    });
+    
+    const { fullName, email, phone, password, collegeName, preferredGender, emergencyContact, otp } = req.body
+
+    // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { phone }] })
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists" })
+      return res.status(400).json({ 
+        success: false,
+        message: "User already exists with this email or phone" 
+      })
     }
-     // Get thumbnail image from request files
-    
-        // Find the most recent OTP for the email
+
+    // Find the most recent OTP for the email
     const response = await OTP.find({ email }).sort({ createdAt: -1 }).limit(1)
-        console.log(response)
-        if (response.length === 0) {
-          // OTP not found for the email
+    console.log("OTP check:", {
+      email,
+      providedOtp: otp,
+      foundOtp: response.length > 0 ? response[0].otp : "No OTP found",
+      otpRecord: response
+    });
+    
+    if (response.length === 0) {
+      // OTP not found for the email
+      return res.status(400).json({
+        success: false,
+        message: "The OTP is not found for this email",
+      })
+    } else if (otp !== response[0].otp) {
+      // Invalid OTP
+      return res.status(400).json({
+        success: false,
+        message: "The provided OTP is not valid",
+      })
+    }
+
+    // Upload collegeId to Cloudinary if provided
+    let collegeId = null
+    if (req.files && req.files.collegeId) {
+      console.log("College ID file found:", req.files.collegeId.name);
+      try {
+        const collegeIdFile = req.files.collegeId
+        const collegeIdUpload = await uploadFileToCloudinary(
+          collegeIdFile,
+          "coride/college_ids"
+        )
+        
+        if (!collegeIdUpload) {
           return res.status(400).json({
             success: false,
-            message: "The OTP is not found",
-          })
-        } else if (otp !== response[0].otp) {
-          // Invalid OTP
-          return res.status(400).json({
-            success: false,
-            message: "The OTP is not valid",
-          })
+            message: "Failed to upload college ID",
+          });
         }
-   
+        
+        collegeId = collegeIdUpload
+        console.log("College ID uploaded successfully:", collegeId);
+      } catch (uploadError) {
+        console.error("College ID upload error:", uploadError);
+        return res.status(400).json({
+          success: false,
+          message: "Error uploading college ID",
+          error: uploadError.message
+        });
+      }
+    } else {
+      console.log("No college ID file provided in the request");
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const user = await User.create({
-        fullName,
-        email,
-        phone,
-        password: hashedPassword,
-        collegeName,
-        preferredGender,
-        emergencyContact,
-        // collegeId: "",
-        // profilePicture: `https://api.dicebear.com/5.x/initials/svg?seed=${fullName}`,
-      })
-      
-      return res.status(200).json({
-        success: true,
-        user,
-        message: "User registered successfully",
-      })
-    } catch (error) {
-      console.error(error)
-      return res.status(500).json({
-        success: false,
-        message: "User cannot be registered. Please try again.",
-      })
-    }
+      fullName,
+      email,
+      phone,
+      password: hashedPassword,
+      collegeName,
+      preferredGender,
+      emergencyContact,
+      collegeId,
+      // profilePicture: `https://api.dicebear.com/5.x/initials/svg?seed=${fullName}`,
+    })
+    
+    return res.status(200).json({
+      success: true,
+      user,
+      message: "User registered successfully",
+    })
+  } catch (error) {
+    console.error("Signup error:", error)
+    return res.status(500).json({
+      success: false,
+      message: "User cannot be registered. Please try again.",
+      error: error.message
+    })
+  }
 }
 
 exports.sendotp = async (req, res) => {
@@ -173,6 +221,36 @@ exports.login = async (req, res) => {
 		});
 	}
 };
+
+// Get user profile after they've logged in
+exports.getUserProfile = async (req, res) => {
+  try {
+    // Get user ID from request object (set by auth middleware)
+    const userId = req.user.id;
+    
+    // Find user by ID and exclude sensitive information
+    const user = await User.findById(userId).select("-password");
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Return user data
+    return res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user profile",
+    });
+  }
+}
 
 // Send OTP For Email Verification
 // exports.sendotp = async (req, res) => {

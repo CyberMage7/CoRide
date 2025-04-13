@@ -22,6 +22,7 @@ import {
   Users,
   MapPin,
 } from "lucide-react";
+import { signUp } from "../services/operations/authAPI";
 
 // Particle component for background effects
 const Particle = ({ delay }) => (
@@ -76,7 +77,7 @@ export default function Signup() {
     email: "",
     phone: "",
     collegeName: "",
-    // collegeId: null,
+    collegeId: null,
     password: "",
     confirmPassword: "",
     // profilePic: null,
@@ -137,12 +138,13 @@ export default function Signup() {
         newErrors.confirmPassword = "Passwords do not match";
       if (!formData.collegeName.trim())
         newErrors.collegeName = "College name is required";
+      if (!formData.collegeId)
+        newErrors.collegeId = "College ID is required";
     }
 
     if (stepNumber === 3) {
       // if (!formData.profilePic)
       //   newErrors.profilePic = "Profile picture is required";
-      // if (!formData.collegeId) newErrors.collegeId = "College ID is required";
       if (!formData.preferredGender)
         newErrors.preferredGender = "Please select preferred gender";
       if (!formData.emergencyContact)
@@ -220,22 +222,18 @@ export default function Signup() {
       toast.error("Please fill all required fields correctly");
       return;
     }
-    const signupData = {
-      ...formData,
-    };
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      toast.success("Account created successfully!");
-      // Reset form or redirect
-      dispatch(setSignupData(signupData));
-      // Send OTP to user for verification
+      // Store signup data in Redux state
+      dispatch(setSignupData(formData));
+      
+      // Only send OTP and navigate to verification page
       dispatch(sendOtp(formData.email, navigate));
     } catch (error) {
+      console.error("Signup error:", error);
       toast.error("Something went wrong. Please try again.");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -522,6 +520,44 @@ export default function Signup() {
                     </div>
                   </div>
 
+                  {/* College ID Upload */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      College ID
+                    </label>
+                    <div className="flex items-center gap-4">
+                      {idPreview && (
+                        <img
+                          src={idPreview}
+                          alt="ID preview"
+                          className="w-16 h-16 rounded object-cover"
+                        />
+                      )}
+                      <label
+                        className={`flex-1 flex items-center gap-2 p-4 border-2 border-dashed ${
+                          errors.collegeId
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        } rounded-lg hover:bg-gray-50 cursor-pointer`}
+                      >
+                        <Upload className="h-5 w-5 text-gray-400" />
+                        <span className="text-gray-600">Upload College ID</span>
+                        <input
+                          name="collegeId"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleChange}
+                        />
+                      </label>
+                    </div>
+                    {errors.collegeId && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {errors.collegeId}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -582,44 +618,6 @@ export default function Signup() {
                     {errors.profilePic && (
                       <p className="mt-1 text-xs text-red-500">
                         {errors.profilePic}
-                      </p>
-                    )}
-                  </div> */}
-
-                  {/* College ID Upload */}
-                  {/* <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      College ID
-                    </label>
-                    <div className="flex items-center gap-4">
-                      {idPreview && (
-                        <img
-                          src={idPreview || "/placeholder.svg"}
-                          alt="ID preview"
-                          className="w-16 h-16 rounded object-cover"
-                        />
-                      )}
-                      <label
-                        className={`flex-1 flex items-center gap-2 p-4 border-2 border-dashed ${
-                          errors.collegeId
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        } rounded-lg hover:bg-gray-50 cursor-pointer`}
-                      >
-                        <Upload className="h-5 w-5 text-gray-400" />
-                        <span className="text-gray-600">Upload ID</span>
-                        <input
-                          name="collegeId"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleChange}
-                        />
-                      </label>
-                    </div>
-                    {errors.collegeId && (
-                      <p className="mt-1 text-xs text-red-500">
-                        {errors.collegeId}
                       </p>
                     )}
                   </div> */}

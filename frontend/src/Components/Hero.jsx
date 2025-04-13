@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Car, Users, DollarSign, Clock } from "lucide-react";
 import heroming from "../assets/heroimg.png";
@@ -8,6 +8,12 @@ import a3 from "../assets/a3.png";
 export default function Hero() {
   // This would come from your authentication context in a real app
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => {
+    const tokens = localStorage.getItem('token');
+    if(tokens){
+      setIsLoggedIn(true);
+    }
+  }, []);
 
   return (
     <div className="relative overflow-hidden">
