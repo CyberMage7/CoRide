@@ -10,7 +10,10 @@ const userSchema = new mongoose.Schema(
     // confirmpassword:{type:String,required:true},
     collegeName: { type: String, required: true },
     // profilePicture: { type: String }, // images
-    // collegeId: { type: String },  // images
+    collegeId: { 
+      public_id: { type: String },
+      secure_url: { type: String },
+    },  // images from cloudinary
     preferredGender: { type: String },
     emergencyContact: { type: String },
     token: {

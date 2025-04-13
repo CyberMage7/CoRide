@@ -24,7 +24,15 @@ export function getUserDetails(token, navigate) {
       if (!response.data.success) {
         throw new Error(response.data.message)
       }
-      const userImage =`https://api.dicebear.com/5.x/initials/svg?seed=${response.data.data.fullName}`
+      
+      // Set user image from Cloudinary if available or use default
+      let userImage;
+      if (response.data.data.collegeId && response.data.data.collegeId.secure_url) {
+        userImage = response.data.data.collegeId.secure_url;
+      } else {
+        userImage = `https://api.dicebear.com/5.x/initials/svg?seed=${response.data.data.fullName}`;
+      }
+      
       dispatch(setUser({ ...response.data.data, image: userImage }))
     } catch (error) {
       dispatch(logout(navigate))
