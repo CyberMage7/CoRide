@@ -1,0 +1,381 @@
+const Ride = require('../models/Ride');
+const User = require('../models/User');
+const mongoose = require('mongoose');
+
+// Create a new ride
+exports.createRide = async (req, res) => {
+  try {
+    const { 
+      source, 
+      destination, 
+      rideType, 
+      pickupTime, 
+      sourceCoordinates,
+      destinationCoordinates,
+      fare
+    } = req.body;
+
+    // Validate required fields
+    if (!source || !destination || !rideType || !pickupTime) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields' 
+      });
+    }
+
+    // Create base ride object
+    const rideData = {
+      userId: req.user.id,
+      source,
+      destination,
+      rideType,
+      pickupTime: new Date(pickupTime),
+      bookingTime: new Date(),
+      isPreBooked: true,
+      sourceCoordinates,
+      destinationCoordinates,
+      fare
+    };
+
+    // Handle based on ride type
+    if (rideType === 'private') {
+      // For private rides, set status directly to 'private'
+      rideData.status = 'private';
+      
+      const ride = await Ride.create(rideData);
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Private ride created successfully',
+        data: ride
+      });
+    } else if (rideType === 'shared') {
+      // For shared rides, try to find a match
+      // Calculate time window (±15 minutes)
+      const pickupTimeObj = new Date(pickupTime);
+      const fifteenMinutes = 15 * 60 * 1000;
+      const lowerTimeLimit = new Date(pickupTimeObj.getTime() - fifteenMinutes);
+      const upperTimeLimit = new Date(pickupTimeObj.getTime() + fifteenMinutes);
+
+      // Find matching rides
+      const matchingRide = await Ride.findOne({
+        destination,
+        rideType: 'shared',
+        status: 'waiting',
+        pickupTime: { $gte: lowerTimeLimit, $lte: upperTimeLimit },
+        userId: { $ne: req.user.id } // Ensure it's not the user's own ride
+      });
+
+      if (matchingRide) {
+        // Found a matching ride - add current user
+        matchingRide.matchedWith.push(req.user.id);
+        
+        // Initialize consent status as pending
+        if (!matchingRide.consentStatus) {
+          matchingRide.consentStatus = new Map();
+        }
+        
+        // Set consent status for original user (if not already set)
+        if (!matchingRide.consentStatus.has(matchingRide.userId.toString())) {
+          matchingRide.consentStatus.set(matchingRide.userId.toString(), 'pending');
+        }
+        
+        // Set consent status for current user
+        matchingRide.consentStatus.set(req.user.id, 'pending');
+        
+        await matchingRide.save();
+        
+        // TODO: Send notification to matched users about match
+
+        return res.status(200).json({
+          success: true,
+          message: 'Found matching shared ride',
+          data: matchingRide
+        });
+      } else {
+        // No matching ride found - create new ride with waiting status
+        rideData.status = 'waiting';
+        
+        // Initialize empty consentStatus map
+        rideData.consentStatus = new Map();
+        
+        const ride = await Ride.create(rideData);
+        
+        return res.status(201).json({
+          success: true,
+          message: 'Created new shared ride in waiting status',
+          data: ride
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ride type'
+      });
+    }
+  } catch (error) {
+    console.error('Create ride error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create ride',
+      error: error.message
+    });
+  }
+};
+
+// Get user's rides
+exports.getUserRides = async (req, res) => {
+  try {
+    // Find rides where user is either creator or matched
+    const rides = await Ride.find({
+      $or: [
+        { userId: req.user.id },
+        { matchedWith: req.user.id }
+      ]
+    }).sort({ pickupTime: -1 });
+    
+    return res.status(200).json({
+      success: true,
+      count: rides.length,
+      data: rides
+    });
+  } catch (error) {
+    console.error('Get user rides error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch rides',
+      error: error.message
+    });
+  }
+};
+
+// Get ride by ID
+exports.getRideById = async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.id)
+      .populate('userId', 'name email')
+      .populate('matchedWith', 'name email');
+    
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ride not found'
+      });
+    }
+    
+    // Check if user has permission to view this ride
+    const isUserRide = 
+      ride.userId._id.toString() === req.user.id || 
+      ride.matchedWith.some(user => user._id.toString() === req.user.id);
+    
+    if (!isUserRide) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view this ride'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      data: ride
+    });
+  } catch (error) {
+    console.error('Get ride by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch ride',
+      error: error.message
+    });
+  }
+};
+
+// Update ride consent
+exports.updateRideConsent = async (req, res) => {
+  try {
+    const { rideId, consent } = req.body;
+    
+    if (!rideId || !consent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing ride ID or consent status'
+      });
+    }
+    
+    if (!['accepted', 'declined'].includes(consent)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Consent must be either accepted or declined'
+      });
+    }
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ride not found'
+      });
+    }
+    
+    // Check if user is part of this ride
+    const isUserRide = 
+      ride.userId.toString() === req.user.id || 
+      ride.matchedWith.includes(req.user.id);
+    
+    if (!isUserRide) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to update this ride'
+      });
+    }
+    
+    // Update consent status for this user
+    if (!ride.consentStatus) {
+      ride.consentStatus = new Map();
+    }
+    
+    ride.consentStatus.set(req.user.id, consent);
+    
+    // If consent declined, handle accordingly
+    if (consent === 'declined') {
+      // If ride creator declined, keep all other users in the ride
+      if (ride.userId.toString() === req.user.id) {
+        // Create a new ride for the original user with private status
+        const newRide = new Ride({
+          userId: req.user.id,
+          source: ride.source,
+          destination: ride.destination,
+          rideType: 'private',
+          pickupTime: ride.pickupTime,
+          bookingTime: ride.bookingTime,
+          isPreBooked: true,
+          status: 'private',
+          sourceCoordinates: ride.sourceCoordinates,
+          destinationCoordinates: ride.destinationCoordinates,
+          fare: ride.fare
+        });
+        
+        await newRide.save();
+        
+        // If there's only one matched user, convert their ride to private
+        if (ride.matchedWith.length === 1) {
+          ride.userId = ride.matchedWith[0];
+          ride.matchedWith = [];
+          ride.consentStatus = new Map();
+          ride.rideType = 'private';
+          ride.status = 'private';
+        } else {
+          // If there are multiple matched users, remove the original user from the ride
+          ride.userId = ride.matchedWith[0]; // First matched user becomes the ride owner
+          ride.matchedWith = ride.matchedWith.slice(1); // Remove the new owner from matched users
+        }
+      } else {
+        // If matched user declined, just remove them from the ride
+        ride.matchedWith = ride.matchedWith.filter(
+          userId => userId.toString() !== req.user.id
+        );
+        ride.consentStatus.delete(req.user.id);
+        
+        // Create a new private ride for the declining user
+        const newRide = new Ride({
+          userId: req.user.id,
+          source: ride.source,
+          destination: ride.destination,
+          rideType: 'private',
+          pickupTime: ride.pickupTime,
+          bookingTime: ride.bookingTime,
+          isPreBooked: true,
+          status: 'private',
+          sourceCoordinates: ride.sourceCoordinates,
+          destinationCoordinates: ride.destinationCoordinates,
+          fare: ride.fare
+        });
+        
+        await newRide.save();
+        
+        // If no more matched users, convert the original ride to private
+        if (ride.matchedWith.length === 0) {
+          ride.rideType = 'private';
+          ride.status = 'private';
+          ride.consentStatus = new Map();
+        }
+      }
+    } else if (consent === 'accepted') {
+      // Check if all users have accepted
+      let allAccepted = true;
+      
+      // Check original user
+      if (ride.consentStatus.get(ride.userId.toString()) !== 'accepted') {
+        allAccepted = false;
+      }
+      
+      // Check all matched users
+      for (const matchedUserId of ride.matchedWith) {
+        if (ride.consentStatus.get(matchedUserId.toString()) !== 'accepted') {
+          allAccepted = false;
+          break;
+        }
+      }
+      
+      // If all accepted, update ride status to confirmed
+      if (allAccepted) {
+        ride.status = 'confirmed';
+      }
+    }
+    
+    await ride.save();
+    
+    return res.status(200).json({
+      success: true,
+      message: `Ride consent updated to ${consent}`,
+      data: ride
+    });
+  } catch (error) {
+    console.error('Update ride consent error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update ride consent',
+      error: error.message
+    });
+  }
+};
+
+// Cancel ride
+exports.cancelRide = async (req, res) => {
+  try {
+    const { rideId } = req.params;
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ride not found'
+      });
+    }
+    
+    // Check if user is owner of this ride
+    if (ride.userId.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to cancel this ride'
+      });
+    }
+    
+    // Cancel the ride
+    ride.status = 'cancelled';
+    await ride.save();
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Ride cancelled successfully'
+    });
+  } catch (error) {
+    console.error('Cancel ride error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel ride',
+      error: error.message
+    });
+  }
+}; 

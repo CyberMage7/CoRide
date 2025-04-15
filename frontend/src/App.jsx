@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
+import 'leaflet/dist/leaflet.css';
+
 import Navbar from "./Components/Navbar";
 import { Route, Routes } from "react-router-dom";
 import HomePage from "./Pages/HomePage";
@@ -11,6 +13,9 @@ import UserDashboard from "./Pages/Dashboard";
 import { useDispatch, useSelector } from "react-redux";
 import { getUserProfile } from "./services/operations/authAPI";
 import AboutUs from "./Pages/AboutUs";
+import Ride from "./Pages/Ride";
+import RideConfirmation from "./Pages/RideConfirmation";
+import MyRides from "./Pages/MyRides";
 
 function App() {
   const dispatch = useDispatch();
@@ -32,6 +37,9 @@ function App() {
         <Route path="login" element={<Login />} />
         <Route path="about" element={<AboutUs />} />
         <Route path="dashboard" element={<UserDashboard />} />
+        <Route path="ride" element={<Ride />} />
+        <Route path="ride-confirmation" element={<RideConfirmation />} />
+        <Route path="my-rides" element={<MyRides />} />
         <Route
           path="verify-email"
           element={

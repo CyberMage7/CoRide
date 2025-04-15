@@ -40,7 +40,7 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               {isLoggedIn ? (
                 <Link
-                  to="/book-ride"
+                  to="/ride"
                   className="px-8 py-3 bg-[#9CAFAA] hover:bg-[#7A9994] text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300 text-center"
                 >
                   Book a Ride

@@ -13,6 +13,8 @@ import {
   Menu,
 } from "lucide-react";
 import logo from "../assets/logo.png";
+import { useSelector } from "react-redux";
+import ProfileDropdown from "./core/Auth/ProfileDropdown";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,6 +23,7 @@ export default function Navbar() {
 
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [mobileHowItWorksOpen, setMobileHowItWorksOpen] = useState(false);
+  const { token } = useSelector((state) => state.auth);
 
   // Helper function to create nav link classes based on active state
   const navLinkClass = (isActive) => `
@@ -326,12 +329,18 @@ export default function Navbar() {
       )}
 
       {/* Sign Up / Login Button */}
-      <Link
-        to="/login"
-        className="hidden md:flex items-center justify-center px-4 py-2 rounded bg-[#9CAFAA] hover:bg-[#7A9994] text-white shadow-md transition-all duration-300 hover:shadow-lg"
-      >
-        Sign Up / Login
-      </Link>
+      <div className="hidden md:flex items-center gap-4">
+        {token === null ? (
+          <Link
+            to="/login"
+            className="flex items-center justify-center px-4 py-2 rounded bg-[#9CAFAA] hover:bg-[#7A9994] text-white shadow-md transition-all duration-300 hover:shadow-lg"
+          >
+            Sign Up / Login
+          </Link>
+        ) : (
+          <ProfileDropdown />
+        )}
+      </div>
     </nav>
   );
 }

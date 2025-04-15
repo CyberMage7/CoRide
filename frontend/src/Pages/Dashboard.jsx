@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { getUserProfile } from "../services/operations/authAPI"
+import { useNavigate } from "react-router-dom"
+import axios from "axios"
 import {
     User,
     School,
@@ -165,6 +167,7 @@ const Progress = ({ value = 0, className = "", color = "#9CAFAA", ...props }) =>
 }
 
 export default function UserDashboard() {
+    const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [showPasswordChange, setShowPasswordChange] = useState(false)
@@ -259,6 +262,55 @@ export default function UserDashboard() {
         }
     }, [user])
 
+    // Fetch user rides for dashboard
+    useEffect(() => {
+        const fetchUserRides = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                
+                const response = await axios.get(
+                    `${import.meta.env.VITE_BASE_URL}/rides`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+                
+                const rides = response.data.data || [];
+                
+                if (rides.length > 0) {
+                    // Sort rides by date (newest first) to find the latest ride
+                    const sortedRides = [...rides].sort((a, b) => 
+                        new Date(b.pickupTime) - new Date(a.pickupTime)
+                    );
+                    
+                    // Format the date of the latest ride
+                    const lastRideDate = new Date(sortedRides[0].pickupTime);
+                    const formattedDate = new Intl.DateTimeFormat('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }).format(lastRideDate);
+                    
+                    // Update user data with ride information
+                    setUserData(prev => ({
+                        ...prev,
+                        ridesTaken: rides.length,
+                        lastRide: formattedDate
+                    }));
+                }
+            } catch (err) {
+                console.error("Error fetching user rides:", err);
+            }
+        };
+        
+        if (!isLoading) {
+            fetchUserRides();
+        }
+    }, [isLoading]);
+
     const handleEdit = () => {
         setIsEditing(true)
     }
@@ -334,6 +386,11 @@ export default function UserDashboard() {
         }
     }
 
+    // Navigate to ride history
+    const goToRideHistory = () => {
+        navigate('/my-rides?view=all');
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -344,7 +401,7 @@ export default function UserDashboard() {
             </div>
         )
     }
-
+    const userImage = `https://api.dicebear.com/5.x/initials/svg?seed=${user?.fullName}`
     return (
         <div className="min-h-screen bg-gradient-to-b from-[#FBF3D5]/50 to-white">
             <div className="container mx-auto py-10 px-4 max-w-6xl">
@@ -352,7 +409,7 @@ export default function UserDashboard() {
                     <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 border-4 border-[#EFBC9B]/30">
                             {user && user.image ? (
-                                <AvatarImage src={user.image} alt={userData.fullName} />
+                                <AvatarImage src={userImage} alt={userData.fullName} />
                             ) : (
                                 <AvatarFallback className="text-xl bg-[#FBF3D5] text-[#9CAFAA]">
                                     {userData.fullName
@@ -665,7 +722,7 @@ export default function UserDashboard() {
                                             </div>
                                             <span className="text-2xl font-bold text-gray-800">{userData.ridesTaken}</span>
                                         </div>
-                                        <Progress value={70} color="#9CAFAA" className="h-2" />
+                                        <Progress value={Math.min(userData.ridesTaken * 10, 100)} color="#9CAFAA" className="h-2" />
                                     </div>
 
                                     <div className="pt-2">
@@ -683,7 +740,12 @@ export default function UserDashboard() {
                             </CardContent>
 
                             <CardFooter className="px-6 pb-6 pt-0">
-                                <Button className="w-full bg-[#9CAFAA] hover:bg-[#8a9e99] text-white">View Ride History</Button>
+                                <Button 
+                                    className="w-full bg-[#9CAFAA] hover:bg-[#8a9e99] text-white"
+                                    onClick={goToRideHistory}
+                                >
+                                    View Ride History
+                                </Button>
                             </CardFooter>
                         </Card>
 
