@@ -333,7 +333,7 @@ export default function Navbar() {
         {token === null ? (
           <Link
             to="/login"
-            className="flex items-center justify-center px-4 py-2 rounded bg-[#9CAFAA] hover:bg-[#7A9994] text-white shadow-md transition-all duration-300 hover:shadow-lg"
+            className="flex items-center justify-center px-4 py-2 rounded bg-[#9CAFAA] hover:bg-[#7A9994] text-white shadow-md transition-all duration-300 hover:shadow-lg mr-3"
           >
             Sign Up / Login
           </Link>
