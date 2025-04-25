@@ -199,7 +199,13 @@ function MyRides() {
                 <div 
                   key={ride._id} 
                   className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/ride-confirmation?id=${ride._id}`)}
+                  onClick={() => {
+                    console.log("Navigating to ride details:", ride._id);
+                    // Try to pass the whole ride object first
+                    navigate('/ride-confirmation', { 
+                      state: { ride: ride } 
+                    });
+                  }}
                 >
                   <div className="p-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
@@ -261,7 +267,16 @@ function MyRides() {
                   </div>
                   
                   <div className="bg-gray-50 py-3 px-6 border-t border-gray-100 flex justify-end">
-                    <button className="text-blue-600 flex items-center gap-1 text-sm">
+                    <button 
+                      className="text-blue-600 flex items-center gap-1 text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent the parent onClick from triggering
+                        console.log("View details button clicked for ride:", ride._id);
+                        navigate('/ride-confirmation', { 
+                          state: { ride: ride } 
+                        });
+                      }}
+                    >
                       View Details <FaChevronRight className="text-xs" />
                     </button>
                   </div>

@@ -152,38 +152,107 @@ exports.getUserRides = async (req, res) => {
 // Get ride by ID
 exports.getRideById = async (req, res) => {
   try {
-    const ride = await Ride.findById(req.params.id)
-      .populate('userId', 'name email')
-      .populate('matchedWith', 'name email');
+    // Get the ride ID from params
+    const { id } = req.params;
     
-    if (!ride) {
-      return res.status(404).json({
+    // Log detailed information for debugging
+    console.log('Ride ID received:', id);
+    console.log('User ID making request:', req.user.id);
+    
+    // Validate the ID format using a try-catch
+    try {
+      // Check if valid MongoDB ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        console.log('Invalid ObjectId format:', id);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid ride ID format'
+        });
+      }
+    } catch (validationError) {
+      console.error('ID validation error:', validationError);
+      return res.status(400).json({
         success: false,
-        message: 'Ride not found'
+        message: 'Invalid ride ID'
       });
     }
     
-    // Check if user has permission to view this ride
-    const isUserRide = 
-      ride.userId._id.toString() === req.user.id || 
-      ride.matchedWith.some(user => user._id.toString() === req.user.id);
+    // First try to get the ride without populating
+    let basicRide;
+    try {
+      basicRide = await Ride.findById(id);
+      
+      if (!basicRide) {
+        console.log('Ride not found in database:', id);
+        return res.status(404).json({
+          success: false,
+          message: 'Ride not found'
+        });
+      }
+      
+      console.log('Basic ride found:', basicRide._id.toString());
+    } catch (findError) {
+      console.error('Error finding ride:', findError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error while finding ride',
+        error: findError.message
+      });
+    }
     
-    if (!isUserRide) {
+    // Now check authorization before populating
+    let isAuthorized = false;
+    
+    // Check if user is the owner
+    if (basicRide.userId && basicRide.userId.toString() === req.user.id) {
+      isAuthorized = true;
+      console.log('User is the ride owner');
+    }
+    
+    // Check if user is in matchedWith array
+    if (!isAuthorized && basicRide.matchedWith && Array.isArray(basicRide.matchedWith)) {
+      isAuthorized = basicRide.matchedWith.some(userId => 
+        userId && userId.toString() === req.user.id
+      );
+      
+      if (isAuthorized) {
+        console.log('User is in matchedWith array');
+      }
+    }
+    
+    if (!isAuthorized) {
+      console.log('User not authorized to view this ride');
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to view this ride'
       });
     }
     
-    return res.status(200).json({
-      success: true,
-      data: ride
-    });
+    // Now get the populated ride with references
+    try {
+      const populatedRide = await Ride.findById(id)
+        .populate('userId', 'name email collegeName')
+        .populate('matchedWith', 'name email collegeName');
+      
+      return res.status(200).json({
+        success: true,
+        data: populatedRide
+      });
+    } catch (populateError) {
+      console.error('Error populating ride:', populateError);
+      
+      // If population fails, return the basic ride instead
+      return res.status(200).json({
+        success: true,
+        data: basicRide,
+        note: 'Unable to load related user details'
+      });
+    }
   } catch (error) {
-    console.error('Get ride by ID error:', error);
-    res.status(500).json({
+    console.error('General error in getRideById:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Failed to fetch ride',
+      message: 'Server error while fetching ride',
       error: error.message
     });
   }

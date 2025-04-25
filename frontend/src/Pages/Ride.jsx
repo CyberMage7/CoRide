@@ -69,7 +69,7 @@ function Ride() {
       }).setView([userPosition.latitude, userPosition.longitude], 13);
 
       // Add custom styled tile layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       }).addTo(mapInstanceRef.current);
@@ -315,6 +315,11 @@ function Ride() {
           easeLinearity: 0.25
         });
       }
+      
+      // Calculate route if destination is already set
+      if (destinationLocation) {
+        calculateRoute(suggestion, destinationLocation);
+      }
     } else {
       setDestinationInput(suggestion.shortName || suggestion.name.split(',')[0]);
       setDestinationLocation(suggestion);
@@ -344,19 +349,19 @@ function Ride() {
           destinationMarkerRef.current.setOpacity(opacity + 0.1);
         }
       }, 25);
+      
+      // Calculate route if source is already set
+      if (sourceLocation) {
+        calculateRoute(sourceLocation, suggestion);
+      }
     }
     
     // Clear suggestions
     setSuggestions({ ...suggestions, [type]: [] });
-    
-    // Calculate and show route if both source and destination are selected
-    if ((type === 'source' && destinationLocation) || (type === 'destination' && sourceLocation)) {
-      calculateRoute();
-    }
   };
 
   // Calculate and display route
-  const calculateRoute = () => {
+  const calculateRoute = (source, destination) => {
     // Remove existing routing control if it exists
     if (routingMachineRef.current) {
       mapInstanceRef.current.removeControl(routingMachineRef.current);
@@ -364,12 +369,12 @@ function Ride() {
     }
     
     // If both source and destination are set, show the route
-    if (sourceLocation && destinationLocation && mapInstanceRef.current) {
+    if (source && destination && mapInstanceRef.current) {
       // Create routing control with modern styling
       routingMachineRef.current = L.Routing.control({
         waypoints: [
-          L.latLng(sourceLocation.latitude, sourceLocation.longitude),
-          L.latLng(destinationLocation.latitude, destinationLocation.longitude)
+          L.latLng(source.latitude, source.longitude),
+          L.latLng(destination.latitude, destination.longitude)
         ],
         routeWhileDragging: false,
         showAlternatives: true,
@@ -417,8 +422,8 @@ function Ride() {
 
       //   // Fit map to show route
         mapInstanceRef.current.fitBounds(L.latLngBounds(
-          L.latLng(sourceLocation.latitude, sourceLocation.longitude),
-          L.latLng(destinationLocation.latitude, destinationLocation.longitude)
+          L.latLng(source.latitude, source.longitude),
+          L.latLng(destination.latitude, destination.longitude)
         ).pad(0.3));
         
         // Ensure routes are visible

@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaHourglass, FaTimes, FaCar, FaUsers, FaMapMarkerAlt, FaClock, FaCalendarAlt, FaUser, FaExchangeAlt, FaArrowLeft } from 'react-icons/fa';
+import { FaCheckCircle, FaHourglass, FaTimes, FaCar, FaUsers, FaMapMarkerAlt, FaClock, FaCalendarAlt, FaUser, FaExchangeAlt, FaArrowLeft, FaSchool, FaPhone, FaEnvelope } from 'react-icons/fa';
 import axios from 'axios';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+import 'leaflet-routing-machine';
 
 function RideConfirmation() {
   const location = useLocation();
@@ -11,13 +15,23 @@ function RideConfirmation() {
   const [error, setError] = useState('');
   const [consentAction, setConsentAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // Map related refs
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const routingControlRef = useRef(null);
+  const sourceMarkerRef = useRef(null);
+  const destinationMarkerRef = useRef(null);
 
   // Fetch ride details either from location state or API
   useEffect(() => {
     const fetchRideDetails = async () => {
       try {
+        console.log("Fetching ride details...");
+        
         // If ride comes from navigation state
         if (location.state && location.state.ride) {
+          console.log("Using ride from navigation state");
           setRide(location.state.ride);
           setLoading(false);
           return;
@@ -28,33 +42,184 @@ function RideConfirmation() {
         const rideId = urlParams.get('id');
 
         if (!rideId) {
+          console.log("No ride ID found in URL");
           setError('No ride information found');
           setLoading(false);
           return;
         }
 
+        console.log("Getting ride with ID:", rideId);
+
         // Fetch ride details from API
         const token = localStorage.getItem('token');
-        const response = await axios.get(
-          `${import.meta.env.VITE_BASE_URL}/rides/${rideId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
+        if (!token) {
+          setError('Authentication required');
+          setLoading(false);
+          navigate('/login');
+          return;
+        }
+        
+        // Try the debug endpoint first
+        console.log("Trying debug endpoint first...");
+        let debugData;
+        try {
+          const debugResponse = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/rides/debug/${rideId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
             }
-          }
-        );
+          );
+          debugData = debugResponse.data;
+          console.log("Debug data:", debugData);
+        } catch (debugErr) {
+          console.log("Debug endpoint failed:", debugErr.response?.status, debugErr.message);
+        }
+        
+        // If debug data shows the ride doesn't exist or user isn't authorized, don't make the main request
+        if (debugData && !debugData.success) {
+          setError(debugData.message || 'Error loading ride details');
+          setLoading(false);
+          return;
+        }
+        
+        // Now try the main ride endpoint
+        try {
+          const response = await axios.get(
+            `${import.meta.env.VITE_BASE_URL}/rides/${rideId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
 
-        setRide(response.data.data);
-        setLoading(false);
+          console.log('Ride data fetched:', response.data);
+          setRide(response.data.data);
+          setLoading(false);
+        } catch (mainErr) {
+          console.error('Error fetching ride details from main endpoint:', mainErr);
+          
+          // If we got debug data earlier, use a simplified version from it
+          if (debugData && debugData.success && debugData.basic) {
+            console.log("Using simplified ride data from debug endpoint");
+            // Create a fallback ride object with basic info
+            const fallbackRide = {
+              _id: debugData.basic.id,
+              rideType: debugData.basic.rideType,
+              status: debugData.basic.status,
+              source: "Unable to load details",
+              destination: "Unable to load details",
+              fare: 0,
+              pickupTime: new Date(),
+              bookingTime: new Date()
+            };
+            
+            setRide(fallbackRide);
+            setError("Limited ride information available. Some details could not be loaded.");
+          } else {
+            setError(mainErr.response?.data?.message || 'Failed to load ride details');
+          }
+          setLoading(false);
+        }
       } catch (err) {
-        console.error('Error fetching ride details:', err);
-        setError(err.response?.data?.message || 'Failed to load ride details');
+        console.error('General error fetching ride details:', err);
+        setError('An unexpected error occurred. Please try again later.');
         setLoading(false);
       }
     };
 
     fetchRideDetails();
-  }, [location]);
+  }, [location, navigate]);
+
+  // Initialize map when ride data is available
+  useEffect(() => {
+    if (ride && mapContainerRef.current && !mapInstanceRef.current) {
+      // Create map
+      mapInstanceRef.current = L.map(mapContainerRef.current).setView([28.6139, 77.2090], 13);
+      
+      // Add tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(mapInstanceRef.current);
+      
+      // If we have coordinates, show the route
+      if (ride.sourceCoordinates && ride.destinationCoordinates) {
+        // Source marker
+        const sourceIcon = L.divIcon({
+          className: 'source-marker',
+          html: `<div style="background-color: #10B981; width: 15px; height: 15px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.2);"></div>`,
+          iconSize: [15, 15],
+          iconAnchor: [7.5, 7.5],
+        });
+        
+        // Destination marker
+        const destIcon = L.divIcon({
+          className: 'destination-marker',
+          html: `<div style="background-color: #EF4444; width: 15px; height: 15px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.2);"></div>`,
+          iconSize: [15, 15],
+          iconAnchor: [7.5, 7.5],
+        });
+        
+        // Add markers
+        sourceMarkerRef.current = L.marker(
+          [ride.sourceCoordinates.latitude, ride.sourceCoordinates.longitude],
+          { icon: sourceIcon }
+        ).addTo(mapInstanceRef.current)
+          .bindPopup(`<b>Pickup:</b> ${ride.source}`);
+        
+        destinationMarkerRef.current = L.marker(
+          [ride.destinationCoordinates.latitude, ride.destinationCoordinates.longitude],
+          { icon: destIcon }
+        ).addTo(mapInstanceRef.current)
+          .bindPopup(`<b>Destination:</b> ${ride.destination}`);
+        
+        // Add routing
+        routingControlRef.current = L.Routing.control({
+          waypoints: [
+            L.latLng(ride.sourceCoordinates.latitude, ride.sourceCoordinates.longitude),
+            L.latLng(ride.destinationCoordinates.latitude, ride.destinationCoordinates.longitude)
+          ],
+          routeWhileDragging: false,
+          showAlternatives: false,
+          fitSelectedRoutes: true,
+          lineOptions: {
+            styles: [
+              { color: '#3B82F6', opacity: 1, weight: 6 },
+              { color: '#2563EB', opacity: 1, weight: 3 }
+            ]
+          },
+          createMarker: function() { return null; } // Disable default markers
+        }).addTo(mapInstanceRef.current);
+        
+        // Hide control container but keep the route visible
+        setTimeout(() => {
+          const routingContainer = document.querySelector('.leaflet-routing-container');
+          if (routingContainer) {
+            routingContainer.style.display = 'none';
+          }
+        }, 500);
+        
+        // Fit map to bounds
+        const bounds = L.latLngBounds(
+          L.latLng(ride.sourceCoordinates.latitude, ride.sourceCoordinates.longitude),
+          L.latLng(ride.destinationCoordinates.latitude, ride.destinationCoordinates.longitude)
+        );
+        mapInstanceRef.current.fitBounds(bounds.pad(0.3));
+      }
+    }
+    
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        routingControlRef.current = null;
+        sourceMarkerRef.current = null;
+        destinationMarkerRef.current = null;
+      }
+    };
+  }, [ride]);
 
   // Handle consent action (accept/decline shared ride)
   const handleConsentAction = async (consent) => {
@@ -192,6 +357,11 @@ function RideConfirmation() {
 
           {/* Content */}
           <div className="p-6">
+            {/* Map Section - New */}
+            <div className="mb-6 overflow-hidden rounded-lg shadow-sm border border-gray-200" style={{ height: '280px' }}>
+              <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }}></div>
+            </div>
+
             {/* Route Info */}
             <div className="mb-6">
               <h3 className="text-gray-500 font-medium mb-3">Route</h3>
@@ -256,7 +426,7 @@ function RideConfirmation() {
             </div>
 
             {/* Shared Ride Matching Info */}
-            {ride.rideType === 'shared' && ride.status === 'waiting' && (
+            {ride.rideType === 'shared' && ride.status === 'waiting' && !ride.matchedWith?.length && (
               <div className="border-t border-gray-100 pt-6 mb-6">
                 <h3 className="text-gray-500 font-medium mb-3">Ride Matching</h3>
                 <div className="bg-yellow-50 p-4 rounded-lg">
@@ -271,16 +441,92 @@ function RideConfirmation() {
               </div>
             )}
 
-            {/* Shared Ride Passenger Consent */}
+            {/* User Info Section - New */}
+            {ride.userId && typeof ride.userId === 'object' && (
+              <div className="border-t border-gray-100 pt-6 mb-6">
+                <h3 className="text-gray-500 font-medium mb-3">Ride Creator</h3>
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="bg-blue-500 text-white rounded-full h-12 w-12 flex items-center justify-center">
+                      <span className="text-lg font-medium">
+                        {ride.userId.name ? ride.userId.name.charAt(0).toUpperCase() : 'U'}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{ride.userId.name || "User"}</p>
+                      <div className="flex flex-wrap gap-x-4 text-sm text-gray-600 mt-1">
+                        {ride.userId.email && (
+                          <div className="flex items-center gap-1">
+                            <FaEnvelope className="text-blue-500" />
+                            <span>{ride.userId.email}</span>
+                          </div>
+                        )}
+                        {ride.userId.collegeName && (
+                          <div className="flex items-center gap-1">
+                            <FaSchool className="text-blue-500" />
+                            <span>{ride.userId.collegeName}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Shared Ride Passenger Information - Enhanced */}
             {ride.rideType === 'shared' && ride.matchedWith && ride.matchedWith.length > 0 && (
               <div className="border-t border-gray-100 pt-6 mb-6">
                 <h3 className="text-gray-500 font-medium mb-3">Co-Passengers</h3>
                 <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                  <p className="text-sm">
+                  <p className="text-sm mb-4">
                     {ride.status === 'confirmed' 
                       ? 'All passengers have confirmed this shared ride.' 
                       : 'Please confirm if you would like to share this ride with the matched passenger(s).'}
                   </p>
+                  
+                  {/* Co-passenger details */}
+                  <div className="space-y-4">
+                    {ride.matchedWith.map((passenger, index) => (
+                      <div key={index} className="bg-white p-3 rounded-lg shadow-sm">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="bg-purple-500 text-white rounded-full h-10 w-10 flex items-center justify-center">
+                            <span className="text-md font-medium">
+                              {passenger.name ? passenger.name.charAt(0).toUpperCase() : 'P'}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium">{passenger.name || "Passenger"}</p>
+                            <div className="flex flex-wrap gap-x-4 text-sm text-gray-600 mt-1">
+                              {passenger.email && (
+                                <div className="flex items-center gap-1">
+                                  <FaEnvelope className="text-purple-500" />
+                                  <span>{passenger.email}</span>
+                                </div>
+                              )}
+                              {passenger.collegeName && (
+                                <div className="flex items-center gap-1">
+                                  <FaSchool className="text-purple-500" />
+                                  <span>{passenger.collegeName}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-gray-100 text-sm text-gray-500">
+                          {ride.status === 'confirmed' ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <FaCheckCircle /> Confirmed
+                            </span>
+                          ) : (
+                            <span className="text-yellow-600 flex items-center gap-1">
+                              <FaHourglass /> Awaiting confirmation
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Consent action buttons */}
@@ -350,4 +596,4 @@ function RideConfirmation() {
   );
 }
 
-export default RideConfirmation; 
+export default RideConfirmation;

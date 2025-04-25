@@ -263,7 +263,7 @@ export function getUserProfile(token) {
       // Also update localStorage
       localStorage.setItem("user", JSON.stringify(updatedUserData));
       
-      console.log("User profile fetched and stored in Redux:", updatedUserData);
+      // console.log("User profile fetched and stored in Redux:", updatedUserData);
       
       toast.success("Profile loaded successfully");
       
