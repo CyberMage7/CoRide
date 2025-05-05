@@ -8,12 +8,18 @@ import "leaflet-routing-machine";
 import { debounce } from "../utils/helpers";
 import { FaMapMarkerAlt, FaMapPin, FaLock, FaTimes, FaCar, FaUsers, FaChevronRight, FaClock } from "react-icons/fa";
 import { MdMyLocation } from "react-icons/md";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
-// import MdMyLocation from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { createRide } from "../services/operations/rideAPI";
 
 function Ride() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  
+  // Get auth and ride states from Redux
+  const { token } = useSelector((state) => state.auth);
+  const { loading } = useSelector((state) => state.rides);
+  
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const userMarkerRef = useRef(null);
@@ -51,13 +57,14 @@ function Ride() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Check if user is logged in
+  // Check if user is logged in using token from Redux
   useEffect(() => {
-    const token = localStorage.getItem("token");
     if (token) {
       setIsLoggedIn(true);
+    } else {
+      setIsLoggedIn(false);
     }
-  }, []);
+  }, [token]);
 
   // Initialize map
   useEffect(() => {
@@ -459,7 +466,7 @@ function Ride() {
     return now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
   };
 
-  // Submit ride request to backend
+  // Submit ride request to backend using Redux
   const submitRideRequest = async () => {
     if (!isLoggedIn) {
       setShowLoginPrompt(true);
@@ -477,7 +484,6 @@ function Ride() {
     }
 
     try {
-      setSubmitLoading(true);
       setError("");
 
       const rideData = {
@@ -496,28 +502,16 @@ function Ride() {
         fare: routeInfo?.price || 0
       };
 
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/rides`, 
-        rideData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      // Navigate to confirmation page with ride data
-      navigate('/ride-confirmation', { state: { ride: response.data.data } });
-
+      // Use the createRide function from rideAPI.js
+      const result = await dispatch(createRide(rideData, navigate));
+      
+      // If the createRide function returns a result, navigate is already handled in the rideAPI
     } catch (err) {
       console.error("Error creating ride:", err);
-      setError(err.response?.data?.message || "Failed to create ride. Please try again.");
-    } finally {
-      setSubmitLoading(false);
+      setError(err.message || "Failed to create ride. Please try again.");
     }
   };
-
+  
   // Find user's location
   const findMyLocation = () => {
     if (location.loaded && !location.error) {
