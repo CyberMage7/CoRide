@@ -14,11 +14,19 @@ function RideConfirmation() {
   const [ride, setRide] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dataFetched, setDataFetched] = useState(false);
+  const [userSource, setUserSource] = useState(null);
+  const [allSources, setAllSources] = useState([]);
 
   const [formattedTime, setFormattedTime] = useState('');
   const [formattedDate, setFormattedDate] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState(null);
+
+  // Get current user from localStorage
+  const getCurrentUserId = () => {
+    const user = JSON.parse(localStorage.getItem("user"));
+    return user?._id;
+  };
 
   // Get the ride ID either from Redux state or from the router state - run only once
   useEffect(() => {
@@ -65,9 +73,12 @@ function RideConfirmation() {
     fetchRideData();
   }, [location.state, reduxRide, dispatch, navigate, dataFetched]);
 
-  // Format pickup time for display when ride data is available - only when ride changes
+  // Format pickup time for display and determine user's source when ride data is available
   useEffect(() => {
-    if (ride?.pickupTime) {
+    if (!ride) return;
+
+    // Format pickup time
+    if (ride.pickupTime) {
       const pickupDate = new Date(ride.pickupTime);
 
       // Format time (e.g., "3:30 PM")
@@ -83,6 +94,60 @@ function RideConfirmation() {
         day: 'numeric',
         year: 'numeric'
       }));
+    }
+
+    // Determine the correct source location for this user
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return;
+
+    // Initialize sources array with the main ride source (owner's source)
+    const sources = [];
+    
+    // Add the ride owner's source first with user details
+    sources.push({
+      userId: typeof ride.userId === 'object' ? ride.userId._id : ride.userId,
+      name: typeof ride.userId === 'object' ? (ride.userId.name || 'Ride Owner') : 'Ride Owner',
+      source: ride.source,
+      coordinates: ride.sourceCoordinates,
+      isCurrentUser: (typeof ride.userId === 'object' ? ride.userId._id : ride.userId) === currentUserId,
+      isOwner: true
+    });
+
+    // If there are matched users, add their sources too
+    if (ride.matchedWith && Array.isArray(ride.matchedWith)) {
+      ride.matchedWith.forEach(match => {
+        const userId = typeof match.userId === 'object' ? match.userId._id : match.userId;
+        const userName = typeof match.userId === 'object' 
+          ? (match.userId.name || match.userId.email?.split('@')[0] || 'Co-passenger') 
+          : 'Co-passenger';
+        
+        sources.push({
+          userId,
+          name: userName,
+          source: match.source,
+          coordinates: match.sourceCoordinates,
+          isCurrentUser: userId === currentUserId,
+          isOwner: false
+        });
+      });
+    }
+
+    // Set all sources
+    setAllSources(sources);
+    
+    // Set current user's source for backward compatibility
+    const userSourceInfo = sources.find(s => s.isCurrentUser);
+    if (userSourceInfo) {
+      setUserSource({
+        name: userSourceInfo.source,
+        coordinates: userSourceInfo.coordinates
+      });
+    } else {
+      // Fallback to main ride source if user source not found
+      setUserSource({
+        name: ride.source,
+        coordinates: ride.sourceCoordinates
+      });
     }
   }, [ride]);
 
@@ -169,6 +234,51 @@ function RideConfirmation() {
     setShowConfirmation(false);
   };
 
+  // Get the count of matched riders
+  const getMatchedRidersCount = () => {
+    if (!ride?.matchedWith) return 0;
+    
+    // Handle both array of objects and array of strings/IDs
+    if (ride.matchedWith.length > 0 && typeof ride.matchedWith[0] === 'object') {
+      return ride.matchedWith.length;
+    }
+    
+    return ride.matchedWith.length;
+  };
+
+  // Get user name based on user object or ID
+  const getUserName = (user) => {
+    if (!user) return "Unknown User";
+    
+    // Case 1: If user is directly a populated user object with name
+    if (typeof user === 'object' && user.name) {
+      return user.name;
+    }
+    
+    // Case 2: If user is a populated user object but name is accessed differently
+    if (typeof user === 'object' && user._id) {
+      // Try common patterns for accessing the name
+      if (user.name) return user.name;
+      if (user.email) return user.email.split('@')[0]; // Fallback to email username
+    }
+    
+    // Case 3: If the user object is nested deeper
+    if (typeof user === 'object' && user.userId) {
+      if (typeof user.userId === 'object') {
+        if (user.userId.name) return user.userId.name;
+        if (user.userId.email) return user.userId.email.split('@')[0];
+      }
+      return "User " + user.userId.toString().slice(-4); // Show last 4 chars of ID
+    }
+    
+    // Case 4: If it's just a string ID
+    if (typeof user === 'string' || (typeof user === 'object' && user.toString)) {
+      return "User " + user.toString().slice(-4); // Show last 4 chars of ID
+    }
+    
+    return "Unknown User";
+  };
+
   // If loading or no ride data, show loading state
   if (loading || reduxLoading || !ride) {
     return (
@@ -224,7 +334,7 @@ function RideConfirmation() {
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Ride Details</h2>
 
               <div className="space-y-4">
-                {/* Source */}
+                {/* User's Source */}
                 <div className="flex">
                   <div className="mr-4">
                     <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
@@ -232,10 +342,30 @@ function RideConfirmation() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-500">Pickup Location</div>
-                    <div className="font-medium">{ride.source}</div>
+                    <div className="text-sm text-gray-500">Your Pickup Location</div>
+                    <div className="font-medium">{userSource?.name || ride.source}</div>
                   </div>
                 </div>
+
+                {/* Show All Passenger Pickup Locations for Shared Rides */}
+                {ride.rideType === 'shared' && ride.status !== 'cancelled' && allSources.length > 1 && (
+                  <div className="mt-2 ml-14">
+                    <div className="text-sm font-medium text-gray-700 mb-2">All Pickup Locations:</div>
+                    <div className="space-y-3 bg-gray-50 p-3 rounded-lg">
+                      {allSources.map((source, index) => (
+                        <div key={index} className="flex items-start">
+                          <div className="w-2 h-2 mt-1.5 rounded-full bg-green-500 ring-2 ring-green-200 mr-2"></div>
+                          <div>
+                            <div className="text-sm font-medium">
+                              {source.name} {source.isCurrentUser && '(You)'} {source.isOwner && '(Ride Owner)'}
+                            </div>
+                            <div className="text-xs text-gray-500">{source.source}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Destination */}
                 <div className="flex">
@@ -278,10 +408,10 @@ function RideConfirmation() {
                     <div className="text-sm text-gray-500">Ride Type</div>
                     <div className="font-medium">
                       {ride.rideType === 'private' ? 'Private Ride' : 'Shared Ride'}
-                      {ride.rideType === 'shared' && ride.matchedWith && (
+                      {ride.rideType === 'shared' && (
                         <span className="ml-2 text-sm text-gray-500">
-                          {ride.matchedWith.length ?
-                            `(Matched with ${ride.matchedWith.length} ${ride.matchedWith.length === 1 ? 'rider' : 'riders'})` :
+                          {getMatchedRidersCount() ?
+                            `(Matched with ${getMatchedRidersCount()} ${getMatchedRidersCount() === 1 ? 'rider' : 'riders'})` :
                             '(Waiting for matches)'}
                         </span>
                       )}
@@ -300,13 +430,18 @@ function RideConfirmation() {
                     <div>
                       <div className="text-sm text-gray-500">Estimated Fare</div>
                       <div className="font-medium">₹{ride.fare}</div>
+                      {ride.originalFare && ride.originalFare > ride.fare && (
+                        <div className="text-xs text-green-600 mt-1">
+                          Discount applied: ₹{ride.originalFare} → ₹{ride.fare}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Consent Status */}
                 {ride.rideType === 'shared' &&
-                  ride.matchedWith?.length > 0 &&
+                  getMatchedRidersCount() > 0 &&
                   hasAnyUserSentConsent() && (
                     <div className="flex">
                       <div className="mr-4">
@@ -324,17 +459,116 @@ function RideConfirmation() {
                       </div>
                     </div>
                   )}
+                  
+                {/* Matched Users - Show only for shared rides */}
+                {ride.rideType === 'shared' && getMatchedRidersCount() > 0 && (
+                  <div className="flex">
+                    <div className="mr-4">
+                      <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
+                        <FaUsers className="text-teal-600" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">
+                        {getCurrentUserId() === ride.userId || getCurrentUserId() === ride.userId?._id ? 'Matched With' : 'Sharing With'}
+                      </div>
+                      <div className="font-medium">
+                        {/* Show ride owner if current user is not the owner */}
+                        {getCurrentUserId() !== ride.userId && getCurrentUserId() !== ride.userId?._id && (
+                          <div className="mb-1">
+                            {ride.userId && typeof ride.userId === 'object' && ride.userId.name ? 
+                              ride.userId.name : 
+                              ride.userId && typeof ride.userId === 'object' && ride.userId.email ?
+                              ride.userId.email.split('@')[0] : 
+                              "Ride Owner"} (Ride Owner)
+                          </div>
+                        )}
+                        
+                        {/* Show matched users */}
+                        {ride.matchedWith && ride.matchedWith.map((match, index) => {
+                          // Determine the name to display
+                          let userName = "A Co-Passenger";
+                          
+                          // Try to get user from populated field
+                          if (match.userId && typeof match.userId === 'object') {
+                            if (match.userId.name) {
+                              userName = match.userId.name;
+                            } else if (match.userId.email) {
+                              userName = match.userId.email.split('@')[0];
+                            }
+                          }
+                          
+                          // Check if this is the current user
+                          const isCurrentUser = 
+                            getCurrentUserId() === match.userId || 
+                            (match.userId && typeof match.userId === 'object' && getCurrentUserId() === match.userId._id);
+                          
+                          return (
+                            <div key={index} className="mb-1">
+                              {userName}
+                              {isCurrentUser && ' (You)'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Shared Ride Consent Section (only for shared rides with matches) */}
             {ride.rideType === 'shared' &&
-              ride.matchedWith?.length > 0 &&
+              getMatchedRidersCount() > 0 &&
               !hasUserSentConsent() && (
                 <div className="mb-8 p-5 bg-blue-50 rounded-xl border border-blue-100">
                   <h3 className="text-lg font-semibold text-gray-800 mb-3">Shared Ride Confirmation</h3>
+                  
                   <p className="text-gray-600 mb-4">
-                    We've found riders going your way! Would you like to share this ride?
+                    {getCurrentUserId() === ride.userId || getCurrentUserId() === ride.userId?._id ? (
+                      <>
+                        We've found {getMatchedRidersCount()} {getMatchedRidersCount() === 1 ? 'rider' : 'riders'} going your way! 
+                        {ride.matchedWith.length > 0 && (
+                          <>
+                            You'll be sharing with{' '}
+                            {ride.matchedWith.map((match, idx) => {
+                              // Get user name
+                              let userName = "A Co-Passenger";
+                              if (match.userId && typeof match.userId === 'object') {
+                                if (match.userId.name) {
+                                  userName = match.userId.name;
+                                } else if (match.userId.email) {
+                                  userName = match.userId.email.split('@')[0];
+                                }
+                              }
+                              
+                              return (
+                                <span key={idx} className="font-medium">
+                                  {idx > 0 && idx === ride.matchedWith.length - 1 ? ' and ' : idx > 0 ? ', ' : ''}
+                                  {userName}
+                                </span>
+                              );
+                            })}.
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {ride.userId && typeof ride.userId === 'object' ? (
+                          <>
+                            You're matched with {ride.userId.name || ride.userId.email?.split('@')[0] || "another rider"}'s ride to {ride.destination}. Would you like to share this ride?
+                          </>
+                        ) : (
+                          <>
+                            You're matched with another rider's ride to {ride.destination}. Would you like to share this ride?
+                          </>
+                        )}
+                      </>
+                    )}
+                  </p>
+
+                  <p className="text-gray-600 mb-4">
+                    Accepting will reduce your fare by half when all riders confirm.
                   </p>
 
                   <div className="flex space-x-4">
@@ -369,7 +603,7 @@ function RideConfirmation() {
               </button>
 
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/my-rides?view=all')}
                 className="px-6 py-2.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors"
               >
                 View All Rides

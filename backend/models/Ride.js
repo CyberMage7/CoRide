@@ -37,8 +37,17 @@ const rideSchema = new mongoose.Schema({
     default: 'waiting' 
   },
   matchedWith: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    source: {
+      type: String
+    },
+    sourceCoordinates: {
+      latitude: { type: Number },
+      longitude: { type: Number }
+    }
   }],
   consentStatus: { 
     type: Map, 
@@ -56,6 +65,9 @@ const rideSchema = new mongoose.Schema({
     longitude: { type: Number }
   },
   fare: {
+    type: Number
+  },
+  originalFare: {
     type: Number
   }
 }, {

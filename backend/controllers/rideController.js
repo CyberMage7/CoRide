@@ -67,8 +67,12 @@ exports.createRide = async (req, res) => {
       });
 
       if (matchingRide) {
-        // Found a matching ride - add current user
-        matchingRide.matchedWith.push(req.user.id);
+        // Found a matching ride - add current user with their source location
+        matchingRide.matchedWith.push({
+          userId: req.user.id,
+          source: source,
+          sourceCoordinates: sourceCoordinates
+        });
         
         // Initialize consent status as pending
         if (!matchingRide.consentStatus) {
@@ -98,6 +102,7 @@ exports.createRide = async (req, res) => {
         
         // Initialize empty consentStatus map
         rideData.consentStatus = new Map();
+        rideData.matchedWith = [];
         
         const ride = await Ride.create(rideData);
         
@@ -130,7 +135,7 @@ exports.getUserRides = async (req, res) => {
     const rides = await Ride.find({
       $or: [
         { userId: req.user.id },
-        { matchedWith: req.user.id }
+        { 'matchedWith.userId': req.user.id }
       ]
     }).sort({ pickupTime: -1 });
     
@@ -211,8 +216,8 @@ exports.getRideById = async (req, res) => {
     
     // Check if user is in matchedWith array
     if (!isAuthorized && basicRide.matchedWith && Array.isArray(basicRide.matchedWith)) {
-      isAuthorized = basicRide.matchedWith.some(userId => 
-        userId && userId.toString() === req.user.id
+      isAuthorized = basicRide.matchedWith.some(match => 
+        match.userId && match.userId.toString() === req.user.id
       );
       
       if (isAuthorized) {
@@ -232,7 +237,7 @@ exports.getRideById = async (req, res) => {
     try {
       const populatedRide = await Ride.findById(id)
         .populate('userId', 'name email collegeName')
-        .populate('matchedWith', 'name email collegeName');
+        .populate('matchedWith.userId', 'name email collegeName');
       
       return res.status(200).json({
         success: true,
@@ -287,9 +292,9 @@ exports.updateRideConsent = async (req, res) => {
     }
     
     // Check if user is part of this ride
-    const isUserRide = 
-      ride.userId.toString() === req.user.id || 
-      ride.matchedWith.includes(req.user.id);
+    const isCreator = ride.userId.toString() === req.user.id;
+    const isMatched = ride.matchedWith.some(match => match.userId.toString() === req.user.id);
+    const isUserRide = isCreator || isMatched;
     
     if (!isUserRide) {
       return res.status(403).json({
@@ -308,7 +313,7 @@ exports.updateRideConsent = async (req, res) => {
     // If consent declined, handle accordingly
     if (consent === 'declined') {
       // If ride creator declined, keep all other users in the ride
-      if (ride.userId.toString() === req.user.id) {
+      if (isCreator) {
         // Create a new ride for the original user with private status
         const newRide = new Ride({
           userId: req.user.id,
@@ -328,34 +333,43 @@ exports.updateRideConsent = async (req, res) => {
         
         // If there's only one matched user, convert their ride to private
         if (ride.matchedWith.length === 1) {
-          ride.userId = ride.matchedWith[0];
+          const matchedUserData = ride.matchedWith[0];
+          ride.userId = matchedUserData.userId;
+          ride.source = matchedUserData.source;
+          ride.sourceCoordinates = matchedUserData.sourceCoordinates;
           ride.matchedWith = [];
           ride.consentStatus = new Map();
           ride.rideType = 'private';
           ride.status = 'private';
         } else {
-          // If there are multiple matched users, remove the original user from the ride
-          ride.userId = ride.matchedWith[0]; // First matched user becomes the ride owner
+          // If there are multiple matched users, first matched user becomes the ride owner
+          const newOwnerData = ride.matchedWith[0];
+          ride.userId = newOwnerData.userId;
+          ride.source = newOwnerData.source;
+          ride.sourceCoordinates = newOwnerData.sourceCoordinates;
           ride.matchedWith = ride.matchedWith.slice(1); // Remove the new owner from matched users
         }
       } else {
         // If matched user declined, just remove them from the ride
         ride.matchedWith = ride.matchedWith.filter(
-          userId => userId.toString() !== req.user.id
+          match => match.userId.toString() !== req.user.id
         );
         ride.consentStatus.delete(req.user.id);
+        
+        // Get user's source location from matchedWith before removing
+        const userMatchData = ride.matchedWith.find(match => match.userId.toString() === req.user.id);
         
         // Create a new private ride for the declining user
         const newRide = new Ride({
           userId: req.user.id,
-          source: ride.source,
+          source: userMatchData ? userMatchData.source : ride.source,
           destination: ride.destination,
           rideType: 'private',
           pickupTime: ride.pickupTime,
           bookingTime: ride.bookingTime,
           isPreBooked: true,
           status: 'private',
-          sourceCoordinates: ride.sourceCoordinates,
+          sourceCoordinates: userMatchData ? userMatchData.sourceCoordinates : ride.sourceCoordinates,
           destinationCoordinates: ride.destinationCoordinates,
           fare: ride.fare
         });
@@ -379,16 +393,22 @@ exports.updateRideConsent = async (req, res) => {
       }
       
       // Check all matched users
-      for (const matchedUserId of ride.matchedWith) {
-        if (ride.consentStatus.get(matchedUserId.toString()) !== 'accepted') {
+      for (const matchedUser of ride.matchedWith) {
+        if (ride.consentStatus.get(matchedUser.userId.toString()) !== 'accepted') {
           allAccepted = false;
           break;
         }
       }
       
-      // If all accepted, update ride status to confirmed
+      // If all accepted, update ride status to confirmed and reduce fare by half
       if (allAccepted) {
         ride.status = 'confirmed';
+        // Store original fare if not already stored
+        if (!ride.originalFare) {
+          ride.originalFare = ride.fare;
+        }
+        // Reduce fare by half
+        ride.fare = Math.round(ride.originalFare / 2);
       }
     }
     
@@ -425,20 +445,82 @@ exports.cancelRide = async (req, res) => {
     
     // Check if user is owner of this ride
     if (ride.userId.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not authorized to cancel this ride'
+      // Also check if user is in matchedWith (for shared rides)
+      const isMatched = ride.matchedWith.some(match => match.userId.toString() === req.user.id);
+      
+      if (!isMatched) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to cancel this ride'
+        });
+      }
+      
+      // If user is matched but not the owner, just remove them from the ride
+      ride.matchedWith = ride.matchedWith.filter(match => match.userId.toString() !== req.user.id);
+      ride.consentStatus.delete(req.user.id);
+      
+      // If no more matched users and ride was shared, convert to private
+      if (ride.rideType === 'shared' && ride.matchedWith.length === 0) {
+        ride.rideType = 'private';
+        ride.status = 'private';
+      }
+      
+      await ride.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'You have been removed from this shared ride'
       });
     }
     
-    // Cancel the ride
-    ride.status = 'cancelled';
-    await ride.save();
-    
-    return res.status(200).json({
-      success: true,
-      message: 'Ride cancelled successfully'
-    });
+    // If user is the owner
+    // For shared rides with matches, transfer ownership to first matched user
+    if (ride.rideType === 'shared' && ride.matchedWith.length > 0) {
+      const newOwnerData = ride.matchedWith[0];
+      const newRide = new Ride({
+        userId: ride.userId, // Keep the original owner
+        source: ride.source,
+        destination: ride.destination,
+        rideType: 'private',
+        pickupTime: ride.pickupTime,
+        bookingTime: ride.bookingTime,
+        isPreBooked: ride.isPreBooked,
+        status: 'cancelled',
+        sourceCoordinates: ride.sourceCoordinates,
+        destinationCoordinates: ride.destinationCoordinates,
+        fare: ride.fare
+      });
+      
+      await newRide.save();
+      
+      // Update the original ride with the new owner
+      ride.userId = newOwnerData.userId;
+      ride.source = newOwnerData.source;
+      ride.sourceCoordinates = newOwnerData.sourceCoordinates;
+      ride.matchedWith = ride.matchedWith.slice(1); // Remove new owner from matches
+      
+      // If no more matches, convert to private
+      if (ride.matchedWith.length === 0) {
+        ride.rideType = 'private';
+        ride.status = 'private';
+      }
+      
+      await ride.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Ride cancelled and ownership transferred'
+      });
+    } else {
+      // For private rides or shared rides with no matches, just cancel
+      ride.status = 'cancelled';
+      await ride.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Ride cancelled successfully'
+      });
+    }
   } catch (error) {
     console.error('Cancel ride error:', error);
     res.status(500).json({
@@ -447,4 +529,4 @@ exports.cancelRide = async (req, res) => {
       error: error.message
     });
   }
-}; 
+};

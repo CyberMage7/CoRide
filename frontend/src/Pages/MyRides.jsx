@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { FaCar, FaUsers, FaCheckCircle, FaHourglass, FaTimes, FaExclamationCircle, FaCalendarAlt, FaMapMarkerAlt, FaArrowRight, FaChevronRight, FaPlus } from 'react-icons/fa';
+import { FaCar, FaUsers, FaCheckCircle, FaHourglass, FaTimes, FaExclamationCircle, FaCalendarAlt, FaMapMarkerAlt, FaArrowRight, FaChevronRight, FaPlus, FaUserCircle } from 'react-icons/fa';
 
 function MyRides() {
   const navigate = useNavigate();
@@ -33,6 +33,7 @@ function MyRides() {
           }
         );
 
+        console.log("GET USER RIDES API RESPONSE............", response);
         setRides(response.data.data);
         setLoading(false);
       } catch (err) {
@@ -96,6 +97,108 @@ function MyRides() {
       default:
         return { color: 'bg-gray-100 text-gray-800', icon: <FaExclamationCircle />, label: status };
     }
+  };
+
+  // Get the count of matched riders
+  const getMatchedRidersCount = (ride) => {
+    if (!ride?.matchedWith) return 0;
+    
+    // Handle both array of objects and array of strings/IDs
+    if (ride.matchedWith.length > 0 && typeof ride.matchedWith[0] === 'object') {
+      return ride.matchedWith.length;
+    }
+    
+    return ride.matchedWith.length;
+  };
+
+  // Get current user ID
+  const getCurrentUserId = () => {
+    const user = JSON.parse(localStorage.getItem("user"));
+    return user?._id;
+  };
+
+  // Get user-specific source for a ride
+  const getUserSource = (ride) => {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return ride.source;
+
+    // If user is the ride owner, use the main ride source
+    if (ride.userId === currentUserId || ride.userId?._id === currentUserId) {
+      return ride.source;
+    }
+
+    // If user is in matchedWith, find their source
+    if (ride.matchedWith && Array.isArray(ride.matchedWith)) {
+      // New structure: array of objects with userId, source, etc.
+      if (ride.matchedWith.length > 0 && typeof ride.matchedWith[0] === 'object') {
+        const matchData = ride.matchedWith.find(match => 
+          match.userId === currentUserId || 
+          (match.userId && match.userId._id === currentUserId)
+        );
+        
+        if (matchData) {
+          return matchData.source;
+        }
+      }
+    }
+
+    // Fallback to main ride source
+    return ride.source;
+  };
+
+  // Get matched user names as a string
+  const getMatchedUserNames = (ride) => {
+    if (!ride) return "";
+    
+    const currentUserId = getCurrentUserId();
+    let names = [];
+    
+    // If user is ride owner, get names of all matched users
+    if (ride.userId === currentUserId || ride.userId?._id === currentUserId) {
+      if (ride.matchedWith && ride.matchedWith.length > 0) {
+        ride.matchedWith.forEach(match => {
+          if (typeof match === 'object' && match.userId) {
+            // Handle both populated and non-populated data structures
+            if (typeof match.userId === 'object') {
+              if (match.userId.name) {
+                names.push(match.userId.name);
+              } else if (match.userId.email) {
+                names.push(match.userId.email.split('@')[0]);
+              } else {
+                names.push("Co-passenger");
+              }
+            } else if (typeof match.userId === 'string') {
+              // If we only have the ID, we can't get the name directly
+              names.push("Co-passenger");
+            }
+          }
+        });
+      }
+    } 
+    // If user is matched, get ride owner's name
+    else if (ride.userId) {
+      if (typeof ride.userId === 'object') {
+        if (ride.userId.name) {
+          names.push(ride.userId.name);
+        } else if (ride.userId.email) {
+          names.push(ride.userId.email.split('@')[0]);
+        } else {
+          names.push("Ride Owner");
+        }
+      } else if (typeof ride.userId === 'string') {
+        // If we only have the ID, we can't get the name directly
+        names.push("Ride Owner");
+      }
+    }
+    
+    if (names.length === 0) return "";
+    if (names.length === 1) return names[0];
+    
+    if (names.length === 2) {
+      return `${names[0]} and ${names[1]}`;
+    }
+    
+    return `${names[0]} and ${names.length - 1} others`;
   };
 
   if (loading) {
@@ -194,6 +297,9 @@ function MyRides() {
           <div className="space-y-4">
             {sortedRides.map(ride => {
               const statusBadge = getStatusBadge(ride.status);
+              const isUserRideOwner = ride.userId === getCurrentUserId() || ride.userId?._id === getCurrentUserId();
+              const userSpecificSource = getUserSource(ride);
+              const matchedUserNames = getMatchedUserNames(ride);
               
               return (
                 <div 
@@ -201,7 +307,6 @@ function MyRides() {
                   className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => {
                     console.log("Navigating to ride details:", ride._id);
-                    // Try to pass the whole ride object first
                     navigate('/ride-confirmation', { 
                       state: { ride: ride } 
                     });
@@ -245,7 +350,10 @@ function MyRides() {
                       <div className="flex-1">
                         <div className="mb-3">
                           <p className="text-sm text-gray-500">From</p>
-                          <p className="font-medium truncate">{ride.source}</p>
+                          <p className="font-medium truncate">{userSpecificSource}</p>
+                          {!isUserRideOwner && ride.rideType === 'shared' && (
+                            <p className="text-xs text-blue-600">Your personal pickup location</p>
+                          )}
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">To</p>
@@ -254,14 +362,30 @@ function MyRides() {
                       </div>
                     </div>
                     
-                    {ride.rideType === 'shared' && ride.matchedWith && ride.matchedWith.length > 0 && (
+                    {ride.rideType === 'shared' && getMatchedRidersCount(ride) > 0 && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <p className="text-sm text-gray-500 mb-1">
                           {ride.status === 'confirmed' ? 'Sharing ride with:' : 'Possible co-passengers:'}
                         </p>
-                        <p className="text-sm font-medium">
-                          {ride.matchedWith.length} passenger(s)
-                        </p>
+                        
+                        {matchedUserNames ? (
+                          <div className="flex items-center">
+                            <FaUserCircle className="text-indigo-500 mr-2" />
+                            <p className="text-sm font-medium">{matchedUserNames}</p>
+                          </div>
+                        ) : (
+                          <p className="text-sm font-medium">
+                            {getMatchedRidersCount(ride)} passenger(s)
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {ride.originalFare && ride.originalFare > ride.fare && (
+                      <div className="mt-2 text-sm text-green-600">
+                        <span className="font-medium">Discounted fare: </span>
+                        <span className="line-through text-gray-500">₹{ride.originalFare}</span>
+                        <span className="ml-1 font-medium">₹{ride.fare}</span>
                       </div>
                     )}
                   </div>

@@ -11,6 +11,7 @@ import { MdMyLocation } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { createRide } from "../services/operations/rideAPI";
+import { getMLPrediction } from "../services/mlAPI";
 
 function Ride() {
   const navigate = useNavigate();
@@ -56,6 +57,11 @@ function Ride() {
   const [pickupTime, setPickupTime] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  // Add state for ML prediction
+  const [mlPrediction, setMlPrediction] = useState(null);
+  const [mlPredictionLoading, setMlPredictionLoading] = useState(false);
+  const [mlPredictionError, setMlPredictionError] = useState("");
 
   // Check if user is logged in using token from Redux
   useEffect(() => {
@@ -278,6 +284,7 @@ function Ride() {
       mapInstanceRef.current.removeControl(routingMachineRef.current);
       routingMachineRef.current = null;
       setRouteInfo(null);
+      setMlPrediction(null); // Clear ML prediction when route is cleared
     }
 
     setSuggestions({ ...suggestions, [type]: [] });
@@ -367,6 +374,40 @@ function Ride() {
     setSuggestions({ ...suggestions, [type]: [] });
   };
 
+  // Get ML prediction for the route
+  const fetchMLPrediction = async (source, destination) => {
+    if (!source || !destination || !pickupTime) {
+      return;
+    }
+    
+    setMlPredictionLoading(true);
+    setMlPredictionError("");
+    
+    try {
+      const predictionData = {
+        source: {
+          latitude: source.latitude,
+          longitude: source.longitude
+        },
+        destination: {
+          latitude: destination.latitude,
+          longitude: destination.longitude
+        },
+        pickupTime: pickupTime || new Date().toISOString(), // Use current time if not set
+        rideType: rideType,
+        numberOfRiders: 1 // Default to 1 rider
+      };
+      
+      const result = await getMLPrediction(predictionData);
+      setMlPrediction(result);
+    } catch (err) {
+      console.error("Error getting ML prediction:", err);
+      setMlPredictionError(err.message || "Failed to get time prediction");
+    } finally {
+      setMlPredictionLoading(false);
+    }
+  };
+
   // Calculate and display route
   const calculateRoute = (source, destination) => {
     // Remove existing routing control if it exists
@@ -427,7 +468,10 @@ function Ride() {
           price: calculatePrice(summary.totalDistance / 1000, rideType)
         });
 
-      //   // Fit map to show route
+        // Get ML prediction for the route
+        fetchMLPrediction(source, destination);
+
+        // Fit map to show route
         mapInstanceRef.current.fitBounds(L.latLngBounds(
           L.latLng(source.latitude, source.longitude),
           L.latLng(destination.latitude, destination.longitude)
@@ -451,6 +495,13 @@ function Ride() {
       }, 100);
     }
   };
+
+  // Effect to refetch ML prediction when pickup time changes
+  useEffect(() => {
+    if (sourceLocation && destinationLocation && pickupTime) {
+      fetchMLPrediction(sourceLocation, destinationLocation);
+    }
+  }, [pickupTime, rideType]);
 
   // Calculate estimated price based on distance and ride type
   const calculatePrice = (distanceKm, type) => {
@@ -523,6 +574,19 @@ function Ride() {
     } else {
       alert("Unable to find your location. Please enable location services.");
     }
+  };
+
+  // Format time from minutes to hours and minutes
+  const formatTime = (minutes) => {
+    if (!minutes && minutes !== 0) return "";
+    
+    if (minutes < 60) {
+      return `${Math.round(minutes)} min`;
+    }
+    
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours} hr${hours > 1 ? 's' : ''} ${mins > 0 ? `${mins} min` : ''}`;
   };
 
   return (
@@ -662,7 +726,7 @@ function Ride() {
           </div>
         )}
         
-        {/* Route Info Display */}
+        {/* Route Info Display with ML Prediction */}
         {routeInfo && (
           <div className="p-5 bg-blue-50 mt-auto border-t border-blue-100">
             <div className="flex items-center justify-between mb-3">
@@ -680,7 +744,7 @@ function Ride() {
                     <div className="font-semibold">{routeInfo.distance} km</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm text-gray-500">Time</div>
+                    <div className="text-sm text-gray-500">Est. Time</div>
                     <div className="font-semibold">{routeInfo.time}</div>
                   </div>
                 </div>
@@ -690,7 +754,38 @@ function Ride() {
                 </div>
               </div>
               
-              <div className="text-xs text-gray-500 text-center">
+              {/* ML Prediction Information */}
+              {mlPredictionLoading ? (
+                <div className="text-center py-2">
+                  <div className="loader inline-block mr-2 h-4 w-4 animate-spin rounded-full border-2 border-solid border-blue-500 border-r-transparent"></div>
+                  <span className="text-sm text-gray-600">Estimating arrival time...</span>
+                </div>
+              ) : mlPrediction ? (
+                <div className="border-t border-gray-100 pt-3 mt-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <FaClock className="text-blue-500 mr-2" />
+                      <div>
+                        <div className="text-sm text-gray-500">Predicted Arrival Time</div>
+                        <div className="font-medium text-blue-700">
+                          {formatTime(mlPrediction.predictedTime)}
+                        </div>
+                      </div>
+                    </div>
+                    {mlPrediction.routeInfo && (
+                      <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded-lg max-w-xs">
+                        {mlPrediction.routeInfo}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : mlPredictionError ? (
+                <div className="text-xs text-red-500 mt-2">
+                  Could not estimate arrival time: {mlPredictionError}
+                </div>
+              ) : null}
+              
+              <div className="text-xs text-gray-500 text-center mt-2">
                 Prices may vary depending on traffic and availability
               </div>
             </div>
