@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { AiOutlineCaretDown } from "react-icons/ai"
 import { VscDashboard, VscSignOut, VscAccount } from "react-icons/vsc"
+import { FaCar } from "react-icons/fa"
 import { useDispatch, useSelector } from "react-redux"
 import { Link, useNavigate } from "react-router-dom"
 import { logout } from "../../../services/operations/authAPI"
@@ -70,6 +71,13 @@ export default function ProfileDropdown() {
                         <div className="flex w-full items-center gap-x-2 py-[12px] px-[16px] text-sm text-[#4A5D58] hover:bg-[#FBF3D5]/50 transition-colors duration-200">
                             <VscAccount className="text-xl" />
                             Dashboard
+                        </div>
+                    </Link>
+                    
+                    <Link to="/my-rides?view=all" onClick={() => setOpen(false)}>
+                        <div className="flex w-full items-center gap-x-2 py-[12px] px-[16px] text-sm text-[#4A5D58] hover:bg-[#FBF3D5]/50 transition-colors duration-200">
+                            <FaCar className="text-xl" />
+                            View All Rides
                         </div>
                     </Link>
                     
